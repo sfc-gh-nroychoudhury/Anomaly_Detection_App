@@ -68,7 +68,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div className="mb-6 grid grid-cols-4 gap-4">
+      <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard label="Flagged users" value={rows.length} accent="blue" icon={Users} />
         <StatCard label="Critical" value={counts.CRITICAL} accent="critical" icon={Flame} />
         <StatCard label="High" value={counts.HIGH} icon={AlertTriangle} />
@@ -99,7 +99,7 @@ export default function DashboardPage() {
           description="Clean bill of health — nothing flagged for this severity filter."
         />
       ) : (
-        <div className="sf-card overflow-hidden">
+        <div className="sf-card overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-sf-line bg-sf-mist/60 text-left text-xs font-medium uppercase tracking-wide text-sf-slate">

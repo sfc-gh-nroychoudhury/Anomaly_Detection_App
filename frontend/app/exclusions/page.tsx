@@ -58,7 +58,7 @@ export default function ExclusionsPage() {
         </div>
       )}
 
-      <form onSubmit={addExclusion} className="sf-card mb-6 grid grid-cols-5 gap-3 px-5 py-4">
+      <form onSubmit={addExclusion} className="sf-card mb-6 grid grid-cols-2 gap-3 px-5 py-4 lg:grid-cols-5">
         <input
           className="sf-input col-span-1"
           placeholder="Username"

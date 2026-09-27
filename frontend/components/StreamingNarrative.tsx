@@ -26,7 +26,7 @@ export default function StreamingNarrative({
 
     const signalSummary = signals
       .filter((s) => s.IS_ANOMALY && s.DISTANCE > 0)
-      .map((s) => `${s.MODEL_NAME}: actual=${s.METRIC_VALUE.toFixed(1)} vs forecast=${s.FORECAST.toFixed(1)} (distance=${s.DISTANCE.toFixed(2)})`)
+      .map((s) => `${s.MODEL_NAME}: actual=${Number(s.METRIC_VALUE).toFixed(1)} vs forecast=${Number(s.FORECAST).toFixed(1)} (distance=${Number(s.DISTANCE).toFixed(2)})`)
       .join('; ');
 
     try {

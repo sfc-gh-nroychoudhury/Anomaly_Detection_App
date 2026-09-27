@@ -8,7 +8,6 @@ import ThemeToggle from './ThemeToggle';
 
 const NAV = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/investigate', label: 'Investigate', icon: Search },
   { href: '/cases', label: 'Cases', icon: ClipboardList },
   { href: '/exclusions', label: 'Exclusions', icon: UserX },
   { href: '/models', label: 'Model Health', icon: Cpu },
@@ -17,6 +16,7 @@ const NAV = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const onInvestigate = pathname.startsWith('/investigate');
 
   return (
     <aside className="flex h-full w-60 flex-shrink-0 flex-col border-r border-sf-line bg-sf-surface">
@@ -33,22 +33,34 @@ export default function Sidebar() {
       </div>
 
       <nav className="flex-1 space-y-0.5 px-3">
-        {NAV.map(({ href, label, icon: Icon }) => {
+        {NAV.map(({ href, label, icon: Icon }, idx) => {
           const active = href === '/' ? pathname === '/' : pathname.startsWith(href);
+          const isActive = href === '/' && onInvestigate ? false : active;
           return (
-            <Link
-              key={href}
-              href={href}
-              className={clsx(
-                'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                active
-                  ? 'bg-sf-blue-tint text-sf-blue-dark'
-                  : 'text-sf-slate hover:bg-sf-mist hover:text-sf-ink'
+            <div key={href}>
+              <Link
+                href={href}
+                className={clsx(
+                  'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                  isActive
+                    ? 'bg-sf-blue-tint text-sf-blue-dark'
+                    : 'text-sf-slate hover:bg-sf-mist hover:text-sf-ink'
+                )}
+              >
+                <Icon size={17} strokeWidth={2} />
+                {label}
+              </Link>
+              {/* Investigate appears after Dashboard when on an investigate page */}
+              {idx === 0 && onInvestigate && (
+                <Link
+                  href={pathname}
+                  className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium bg-sf-blue-tint text-sf-blue-dark transition-colors"
+                >
+                  <Search size={17} strokeWidth={2} />
+                  Investigate
+                </Link>
               )}
-            >
-              <Icon size={17} strokeWidth={2} />
-              {label}
-            </Link>
+            </div>
           );
         })}
       </nav>

@@ -30,7 +30,7 @@ export default function DriftExplorer({ rows }: { rows: DriftSeriesRow[] }) {
           actual: r.METRIC_VALUE,
           forecast: r.FORECAST,
           band: [r.LOWER_BOUND, r.UPPER_BOUND],
-          gap: Math.abs(r.METRIC_VALUE - r.FORECAST),
+          gap: Math.abs(Number(r.METRIC_VALUE) - Number(r.FORECAST)),
           anomaly: r.IS_ANOMALY ? r.METRIC_VALUE : null,
         })),
     [rows, activeModel]

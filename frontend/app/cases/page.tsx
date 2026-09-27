@@ -55,7 +55,7 @@ export default function CasesPage() {
         </div>
       )}
 
-      <div className="mb-6 grid grid-cols-4 gap-4">
+      <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard label="Total cases" value={rows.length} accent="blue" icon={FolderOpen} />
         <StatCard label="Open" value={rows.filter((r) => r.STATUS === 'OPEN').length} icon={FolderOpen} />
         <StatCard label="Investigating" value={rows.filter((r) => r.STATUS === 'INVESTIGATING').length} icon={FolderClock} />

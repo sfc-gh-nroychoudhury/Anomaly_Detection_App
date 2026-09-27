@@ -68,6 +68,7 @@ function getTokenType(): string {
 export interface SqlApiResult {
   columns: string[];
   rows: unknown[][];
+  rowType: Array<{ name: string; type: string }>;
 }
 
 /**
@@ -100,6 +101,8 @@ export async function runQuery(
       statement,
       timeout: 60,
       ...(getDatabase() ? { database: getDatabase() } : {}),
+      ...(envLookup('SNOWFLAKE_ROLE') ? { role: envLookup('SNOWFLAKE_ROLE') } : {}),
+      ...(envLookup('SNOWFLAKE_WAREHOUSE') ? { warehouse: envLookup('SNOWFLAKE_WAREHOUSE') } : {}),
       ...(binds.length ? { bindings } : {}),
     }),
   });
@@ -110,12 +113,52 @@ export async function runQuery(
   }
 
   const data = await res.json();
-  const columns: string[] = (data.resultSetMetaData?.rowType ?? []).map(
-    (c: { name: string }) => c.name
-  );
+  const rowType: Array<{ name: string; type: string }> = (
+    data.resultSetMetaData?.rowType ?? []
+  ).map((c: { name: string; type: string }) => ({ name: c.name, type: c.type }));
+  const columns: string[] = rowType.map((c) => c.name);
   const rows: unknown[][] = data.data ?? [];
 
-  return { columns, rows };
+  return { columns, rows, rowType };
+}
+
+// SQL API type names that should be coerced to JS number
+const NUMERIC_TYPES = new Set([
+  'FIXED', 'REAL', 'FLOAT', 'NUMBER', 'DECIMAL', 'NUMERIC',
+  'INT', 'INTEGER', 'BIGINT', 'SMALLINT', 'TINYINT', 'BYTEINT',
+  'DOUBLE', 'DOUBLE PRECISION',
+]);
+
+const TIMESTAMP_TYPES = new Set([
+  'TIMESTAMP_NTZ', 'TIMESTAMP_LTZ', 'TIMESTAMP_TZ', 'TIMESTAMP',
+  'DATE', 'TIME',
+]);
+
+function coerceValue(val: unknown, sqlType: string): unknown {
+  if (val === null || val === undefined) return val;
+  const t = sqlType.toUpperCase();
+  if (NUMERIC_TYPES.has(t)) {
+    const n = Number(val);
+    return Number.isNaN(n) ? val : n;
+  }
+  if (t === 'BOOLEAN') {
+    if (typeof val === 'string') return val.toLowerCase() === 'true';
+    return Boolean(val);
+  }
+  // Snowflake SQL API sends timestamps as epoch seconds (float), sometimes with
+  // a timezone offset suffix (e.g. "1790519192.183000000 1200" for TIMESTAMP_LTZ).
+  // Convert to ISO strings so new Date() works in the frontend.
+  if (TIMESTAMP_TYPES.has(t) && typeof val === 'string') {
+    // Strip timezone offset suffix (e.g. " 1200" or " -0700") and nanosecond padding
+    const cleaned = val.split(' ')[0];
+    const epoch = Number(cleaned);
+    if (!Number.isNaN(epoch) && epoch > 1e9 && epoch < 1e11) {
+      return new Date(epoch * 1000).toISOString();
+    }
+    // Trim nanosecond precision from date strings
+    return val.replace(/(\.\d{3})\d+$/, '$1');
+  }
+  return val;
 }
 
 /** Convenience helper: runs a query and returns an array of plain objects keyed by column name. */
@@ -123,11 +166,11 @@ export async function runQueryAsObjects<T = Record<string, unknown>>(
   statement: string,
   binds: Array<{ type: string; value: string }> = []
 ): Promise<T[]> {
-  const { columns, rows } = await runQuery(statement, binds);
+  const { columns, rows, rowType } = await runQuery(statement, binds);
   return rows.map((row) => {
     const obj: Record<string, unknown> = {};
     columns.forEach((col, i) => {
-      obj[col] = row[i];
+      obj[col] = coerceValue(row[i], rowType[i]?.type ?? 'TEXT');
     });
     return obj as T;
   });

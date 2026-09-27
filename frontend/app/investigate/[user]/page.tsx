@@ -19,6 +19,16 @@ import ExportPdfButton from '@/components/ExportPdfButton';
 import Skeleton from '@/components/Skeleton';
 import type { AnomalyResultRow, AttackChainRow, DriftSeriesRow, PeerComparisonRow } from '@/lib/types';
 
+function formatTimeline(raw: string): string {
+  try {
+    const parts = raw.split(/\s*->\s*/);
+    const fmt = (s: string) => new Date(s.trim()).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    return parts.length === 2 ? `${fmt(parts[0])} \u2192 ${fmt(parts[1])}` : raw;
+  } catch {
+    return raw;
+  }
+}
+
 const MODEL_LABELS: Record<string, string> = {
   ad_login_count: 'Login count',
   ad_failed_auth: 'Failed authentications',
@@ -139,7 +149,7 @@ export default function InvestigateUserPage({ params }: { params: { user: string
       />
 
       {chain && (
-        <div className="sf-card mb-6 grid grid-cols-3 divide-x divide-sf-line px-0 py-0">
+        <div className="sf-card mb-6 grid grid-cols-1 divide-y divide-sf-line px-0 py-0 md:grid-cols-3 md:divide-x md:divide-y-0">
           <div className="px-5 py-4">
             <div className="sf-eyebrow mb-1.5">Attack chain</div>
             <AttackChainChip chain={chain.ATTACK_CHAIN} />
@@ -150,7 +160,7 @@ export default function InvestigateUserPage({ params }: { params: { user: string
           </div>
           <div className="px-5 py-4">
             <div className="sf-eyebrow mb-1.5">Activity window</div>
-            <div className="text-sm font-medium text-sf-ink">{chain.TIMELINE}</div>
+            <div className="text-sm font-medium text-sf-ink">{formatTimeline(chain.TIMELINE)}</div>
           </div>
         </div>
       )}
