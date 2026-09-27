@@ -1,0 +1,16 @@
+manifest_version: '2.0'
+scanner_packages:
+  - id: 'ml_behavioral_anomaly_pkg'
+    name: 'ML Behavioral Anomaly Detection'
+    short_description: 'ML-based per-user behavioral anomaly detection across 20 signals.'
+    description: 'Trains 20 SNOWFLAKE.ML.ANOMALY_DETECTION models on 90 days of per-user account activity (authentication, data access, reconnaissance, privilege escalation, insider threat, and resource abuse signals), correlates anomalies across signals into attack-chain classifications, and generates Cortex AI narrative explanations for flagged users. Complements static rule-based scanners by adapting to each user''s individual baseline instead of using one fixed threshold for everyone.'
+    scanners:
+      - id: 'ml_behavioral_anomaly'
+        name: 'ML Behavioral Anomaly Scan'
+        short_description: 'Flags users whose behavior deviates from their own 90-day ML-forecasted baseline.'
+        description: 'Runs all 20 anomaly detection models against the last 7 days of account activity, correlates which signals fired per user into a composite 0-100 risk score and an attack-chain classification (e.g. insider_data_theft, credential_theft_exfiltration, privilege_escalation_attack), and returns one finding per severity level with full per-entity detail.'
+        type: 'VULNERABILITY'
+        callback:
+          schema: 'ml_behavioral_anomaly_check'
+          name: 'scan'
+          version: '1.0'

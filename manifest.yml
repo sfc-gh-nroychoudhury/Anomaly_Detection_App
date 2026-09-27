@@ -1,0 +1,50 @@
+manifest_version: 2
+
+artifacts:
+  setup_script: scripts/setup_script.sql
+  readme: README.md
+  default_web_endpoint:
+    service: services.ui_service
+    endpoint: ui
+  container_services:
+    images:
+      # Path segments unverified until confirmed against a real
+      # `SHOW IMAGE REPOSITORIES` in a dev account -- see
+      # tests/dev_account_checklist.md §6. Must exactly match
+      # containers/service_spec.yaml's `image:` value.
+      - /ml_anomaly_pkg/services/app_image_repo/ml_anomaly_ui:latest
+      - /ml_anomaly_pkg/services/app_image_repo/ml_anomaly_ui:v2p30
+
+lifecycle_callbacks:
+  version_initializer: core.version_init
+
+privileges:
+  - CREATE WAREHOUSE:
+      description: "Creates a dedicated warehouse for the scan/correlation procedure and Cortex AI calls."
+  - CREATE COMPUTE POOL:
+      description: "Creates a compute pool to host the app's dashboard container."
+  - BIND SERVICE ENDPOINT:
+      description: "Exposes the app's dashboard as a web endpoint, like a Streamlit app."
+  - IMPORTED PRIVILEGES ON SNOWFLAKE DB:
+      description: "Read-only access to ACCOUNT_USAGE views to detect anomalous account activity."
+
+# The 20 ML models, their training data, and the weekly retrain task all live
+# OUTSIDE the app (see external/install_external_ml.sql) -- Snowflake ML
+# "Class" objects (SNOWFLAKE.ML.ANOMALY_DETECTION) cannot be created inside a
+# Native App's own database (confirmed against a real account). This app
+# requests exactly one reference to a TABLE, materialized externally on a
+# schedule, holding the latest run of all 20 models' detection results.
+# (A PROCEDURE-type reference was tried first but Native Apps cannot invoke a
+# referenced procedure at all -- CALL reference('x')(:arg) is a syntax error,
+# and SELECT ... FROM TABLE(reference('x')(:arg)) fails to resolve -- both
+# confirmed against a real account. TABLE/VIEW references support a plain
+# SELECT, which is why the external script materializes results into a table.)
+references:
+  - external_detection:
+      label: "External ML Detection Results"
+      description: "Reads the latest anomaly detection results from the 20 ML models installed outside the app, refreshed every 6 hours. Required for the dashboard and scans to produce results."
+      privileges:
+        - SELECT
+      object_type: TABLE
+      multi_valued: false
+      register_callback: config.register_single_reference

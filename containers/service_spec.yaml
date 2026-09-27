@@ -1,0 +1,30 @@
+# NOTE: the exact <db> segment of this image path is unverified -- confirm it
+# against `SHOW IMAGE REPOSITORIES IN SCHEMA services;` in a dev account before
+# the first real build/push (see tests/dev_account_checklist.md §7). Must match
+# manifest.yml's artifacts.container_services.images entry exactly.
+spec:
+  containers:
+    - name: ui
+      image: /ml_anomaly_pkg/services/app_image_repo/ml_anomaly_ui:v2p30
+      resources:
+        requests:
+          cpu: "0.5"
+          memory: "1Gi"
+        limits:
+          cpu: "1"
+          memory: "2Gi"
+      readinessProbe:
+        port: 3000
+        path: /api/health
+      env:
+        PORT: "3000"
+        HOSTNAME: "0.0.0.0"
+  endpoints:
+    - name: ui
+      port: 3000
+      public: true
+
+serviceRoles:
+  - name: ui_endpoint_role
+    endpoints:
+      - ui

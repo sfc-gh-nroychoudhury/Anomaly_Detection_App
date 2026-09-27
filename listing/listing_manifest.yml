@@ -1,0 +1,34 @@
+# Draft private/targeted listing manifest — Phase 4 of the build plan.
+# Fill in <PLACEHOLDER> values before running CREATE EXTERNAL LISTING.
+# See .cortex/plans/plan-ml-anomaly-spcs-native-app.md §5 for why private-first,
+# and the "distribution guardrails" section for why public (once proven) reduces
+# consumer setup friction further (automatic Trust Center registration).
+
+title: "ML Behavioral Anomaly Detection"
+subtitle: "Per-user ML anomaly detection for Snowflake account security"
+description: |
+  Trains 20 SNOWFLAKE.ML.ANOMALY_DETECTION models on 90 days of per-user account
+  activity, correlates anomalies across signals into attack-chain classifications,
+  and surfaces findings through an in-app dashboard with Cortex AI-generated
+  narrative explanations. Complements static Trust Center rule-based scanners
+  with per-user adaptive behavioral baselines instead of fixed thresholds.
+
+  Requires ACCOUNTADMIN for one-time setup (grant IMPORTED PRIVILEGES ON
+  SNOWFLAKE DB, register with Trust Center, enable the scanner package) --
+  see README.md.
+
+listing_terms:
+  type: "OFFLINE"
+
+targets:
+  accounts:
+    - "<PILOT_ORG>.<PILOT_ACCOUNT_1>"
+    # - "<PILOT_ORG>.<PILOT_ACCOUNT_2>"   # add up to 100 named accounts
+
+resources:
+  documentation: "<LINK_TO_README_OR_DOCS_SITE>"
+
+# Not set for this private/targeted draft (left for the future public listing):
+#   profile: "<PROVIDER_PROFILE_NAME>"   # required once this becomes a public Marketplace listing
+#   categories: ["SECURITY"]
+#   auto_fulfillment: { refresh_type: SUB_DATABASE_WITH_REFERENCE_USAGE }   # only needed for cross-region

@@ -1,0 +1,114 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  --sf-midnight: #0B1220;
+  --sf-ink: #1A1C22;
+  --sf-slate: #5B6675;
+  --sf-mist: #EEF3F7;
+  --sf-line: #E1E7ED;
+  --sf-surface: #FFFFFF;
+  --sf-blue-tint: #E6F6FD;
+}
+
+.dark {
+  color-scheme: dark;
+  --sf-midnight: #F5F8FC;
+  --sf-ink: #E7ECF3;
+  --sf-slate: #9AA6B4;
+  --sf-mist: #0B1220;
+  --sf-line: #232B3A;
+  --sf-surface: #151C2C;
+  --sf-blue-tint: rgba(41, 181, 232, 0.14);
+}
+
+body {
+  @apply bg-sf-mist text-sf-ink antialiased transition-colors duration-150;
+}
+
+/* Reusable primitives kept out of individual pages so the whole app stays visually consistent. */
+@layer components {
+  .sf-card {
+    @apply rounded-card border border-sf-line bg-sf-surface shadow-card transition-shadow duration-150;
+  }
+  .sf-card:hover {
+    @apply shadow-card-hover;
+  }
+  .sf-pill {
+    @apply inline-flex items-center gap-1 rounded-pill px-2.5 py-0.5 text-xs font-medium;
+  }
+  .sf-btn-primary {
+    @apply inline-flex items-center gap-2 rounded-md bg-sf-blue px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-sf-blue-dark disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .sf-btn-secondary {
+    @apply inline-flex items-center gap-2 rounded-md border border-sf-line bg-sf-surface px-3.5 py-2 text-sm font-medium text-sf-ink transition-colors hover:bg-sf-mist;
+  }
+  .sf-input {
+    @apply w-full rounded-md border border-sf-line bg-sf-surface px-3 py-2 text-sm text-sf-ink outline-none ring-0 focus:border-sf-blue;
+  }
+  .sf-code {
+    @apply rounded-md border border-sf-line bg-sf-midnight px-3 py-2 font-mono text-xs text-sf-mist;
+  }
+  .sf-section-title {
+    @apply flex items-center gap-2 text-sm font-semibold text-sf-ink;
+  }
+  .sf-eyebrow {
+    @apply text-[11px] font-semibold uppercase tracking-wider text-sf-slate;
+  }
+  .sf-skeleton {
+    @apply animate-pulse rounded-md bg-sf-mist;
+  }
+  .sf-tab {
+    @apply relative flex items-center gap-1.5 rounded-t-md px-4 py-3 text-sm font-medium text-sf-slate transition-colors hover:text-sf-ink;
+  }
+  .sf-tab-active {
+    @apply text-sf-blue-dark;
+  }
+  .sf-tab-active::after {
+    content: '';
+    @apply absolute inset-x-3 bottom-0 h-[2.5px] rounded-full bg-sf-blue;
+  }
+}
+
+/* vis-timeline ships its own light-themed CSS; retint it with our tokens so it
+   follows dark mode instead of staying permanently white. */
+.vis-timeline {
+  border: none !important;
+  font-family: inherit;
+  color: var(--sf-ink);
+}
+.vis-timeline .vis-panel,
+.vis-timeline .vis-labelset .vis-label {
+  border-color: var(--sf-line) !important;
+}
+.vis-timeline .vis-labelset .vis-label {
+  color: var(--sf-ink);
+}
+.vis-timeline .vis-time-axis .vis-text {
+  color: var(--sf-slate);
+}
+.vis-timeline .vis-time-axis .vis-grid.vis-minor,
+.vis-timeline .vis-time-axis .vis-grid.vis-major {
+  border-color: var(--sf-line);
+}
+.vis-timeline .vis-item {
+  border-color: #29B5E8;
+  background-color: #E6F6FD;
+  color: #11567F;
+}
+.vis-timeline .vis-item.sf-timeline-critical {
+  border-color: #D6246B;
+  background-color: rgba(214, 36, 107, 0.12);
+  color: #D6246B;
+}
+.vis-timeline .vis-item.sf-timeline-high {
+  border-color: #E8871E;
+  background-color: rgba(232, 135, 30, 0.12);
+  color: #E8871E;
+}
+.vis-timeline .vis-item.vis-selected {
+  border-color: var(--sf-ink);
+}
+
