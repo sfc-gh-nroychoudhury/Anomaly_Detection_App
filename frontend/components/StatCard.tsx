@@ -28,7 +28,7 @@ export default function StatCard({
           </div>
         )}
       </div>
-      <div className={`mt-1.5 text-[26px] font-semibold leading-none ${accentClass}`}>{value}</div>
+      <div className={`mt-1.5 font-semibold leading-none ${accentClass} ${typeof value === 'string' && value.length > 6 ? 'text-[16px]' : 'text-[26px]'}`}>{value}</div>
     </div>
   );
 }

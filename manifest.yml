@@ -13,7 +13,7 @@ artifacts:
       # tests/dev_account_checklist.md §6. Must exactly match
       # containers/service_spec.yaml's `image:` value.
       - /ml_anomaly_pkg/services/app_image_repo/ml_anomaly_ui:latest
-      - /ml_anomaly_pkg/services/app_image_repo/ml_anomaly_ui:v2p30
+      - /ml_anomaly_pkg/services/app_image_repo/ml_anomaly_ui:v2p40
 
 lifecycle_callbacks:
   version_initializer: core.version_init

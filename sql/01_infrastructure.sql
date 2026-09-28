@@ -80,6 +80,6 @@ CREATE APPLICATION ROLE IF NOT EXISTS trust_center_integration_role;
 GRANT USAGE ON SCHEMA trust_center TO APPLICATION ROLE trust_center_integration_role;
 GRANT SELECT, INSERT ON TABLE trust_center.anomaly_results TO APPLICATION ROLE trust_center_integration_role;
 GRANT SELECT, INSERT ON TABLE trust_center.attack_chains TO APPLICATION ROLE trust_center_integration_role;
-GRANT SELECT ON TABLE trust_center.scan_exclusions TO APPLICATION ROLE trust_center_integration_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE trust_center.scan_exclusions TO APPLICATION ROLE trust_center_integration_role;
 
 SELECT 'Infrastructure ready.' AS status;

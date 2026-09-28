@@ -1,6 +1,6 @@
 -- =============================================================================
 -- setup_script.sql
--- Assembled from sql/01_*.sql through sql/06_*.sql -- DO NOT hand-edit this file.
+-- Assembled from sql/01_*.sql through sql/08_*.sql -- DO NOT hand-edit this file.
 -- Edit the source files in sql/ and reassemble instead, so this stays diffable
 -- and every section traces back to a single source of truth.
 -- =============================================================================
@@ -88,7 +88,7 @@ CREATE APPLICATION ROLE IF NOT EXISTS trust_center_integration_role;
 GRANT USAGE ON SCHEMA trust_center TO APPLICATION ROLE trust_center_integration_role;
 GRANT SELECT, INSERT ON TABLE trust_center.anomaly_results TO APPLICATION ROLE trust_center_integration_role;
 GRANT SELECT, INSERT ON TABLE trust_center.attack_chains TO APPLICATION ROLE trust_center_integration_role;
-GRANT SELECT ON TABLE trust_center.scan_exclusions TO APPLICATION ROLE trust_center_integration_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE trust_center.scan_exclusions TO APPLICATION ROLE trust_center_integration_role;
 
 SELECT 'Infrastructure ready.' AS status;
 -- ---- END sql/01_infrastructure.sql ----
@@ -338,7 +338,18 @@ $$
 DECLARE recommendation VARCHAR;
 BEGIN
   SELECT SNOWFLAKE.CORTEX.COMPLETE('mistral-large2',
-    'You are a Snowflake security expert. User "' || :user_name || '" was flagged with attack chain: "' || :attack_chain || '". Signals: ' || ARRAY_TO_STRING(:signals, ', ') || '. Provide 3-5 specific actionable remediation steps (mention SQL commands). Numbered list:'
+    'You are a Snowflake security expert. User "' || :user_name || '" was flagged with attack chain "' || :attack_chain || '". Signals: ' || ARRAY_TO_STRING(:signals, ', ') || '.
+
+Return ONLY a valid JSON array of 3-5 remediation steps. No prose before or after the JSON. Each element must have exactly these keys:
+- "title": short action title (5-8 words)
+- "description": one sentence explanation of what to do and why
+- "sql": a single Snowflake SQL command (or null if not applicable)
+- "priority": "immediate", "short_term", or "long_term"
+
+Example format:
+[{"title":"Rotate user credentials","description":"Force a password reset to invalidate any stolen credentials.","sql":"ALTER USER VLAMBE SET PASSWORD = ''<new_password>'' MUST_CHANGE_PASSWORD = TRUE;","priority":"immediate"}]
+
+JSON array:'
   ) INTO :recommendation;
   RETURN :recommendation;
 END;
@@ -359,7 +370,23 @@ BEGIN
         ORDER BY BYTES_SCANNED DESC LIMIT 20);
 
   SELECT SNOWFLAKE.CORTEX.COMPLETE('mistral-large2',
-    'You are a security analyst. Summarize what user "' || :user_name || '" has been doing in 3-5 sentences. Flag anything suspicious.\n\nRecent queries (top 20 by volume):\n' || COALESCE(:query_sample, 'No queries') || '\n\nSummary:'
+    'You are a senior security analyst writing an executive briefing. Analyze user "' || :user_name || '" activity over the last 7 days.
+
+Return ONLY a valid JSON object with exactly these keys:
+- "risk_level": one of "critical", "high", "medium", "low"
+- "headline": one sentence executive summary of the situation (max 20 words)
+- "findings": array of 3 objects, each with "label" (2-4 word category like "Data Access Pattern", "Authentication Behavior", "Privilege Usage") and "detail" (one concise sentence)
+- "recommendation": one sentence recommended next action for the security team
+
+No prose before or after the JSON.
+
+Example:
+{"risk_level":"high","headline":"User showed unusual data export patterns consistent with potential exfiltration.","findings":[{"label":"Data Access","detail":"Queried 15 tables across 4 databases, 3x above their 30-day average."},{"label":"Export Activity","detail":"Executed COPY INTO commands targeting external stages."},{"label":"Access Timing","detail":"Activity concentrated between 1-4 AM, outside normal working hours."}],"recommendation":"Immediately review recent COPY INTO and GET_PRESIGNED_URL activity and consider temporary access suspension."}
+
+Recent queries (top 20 by volume):
+' || COALESCE(:query_sample, 'No queries') || '
+
+JSON:'
   ) INTO :activity_summary;
   RETURN :activity_summary;
 END;
@@ -619,4 +646,249 @@ GRANT USAGE ON PROCEDURE trust_center.get_drift_series(VARCHAR) TO APPLICATION R
 
 SELECT 'Enterprise features (cases, peer comparison, drift series) ready.' AS status;
 -- ---- END sql/06_enterprise_features.sql ----
+
+-- ---- BEGIN sql/07_semantic_view.sql ----
+-- =============================================================================
+-- 07_semantic_view.sql
+-- Semantic view over the core security tables, enabling natural-language
+-- querying via Cortex Analyst and Cortex Agents. This view auto-deploys
+-- with the app -- no consumer setup required.
+--
+-- Uses DDL syntax (not YAML) so it runs directly in setup_script.sql.
+-- Tables are referenced without database qualifier since the setup script
+-- runs inside the app's own database context.
+-- =============================================================================
+
+CREATE OR REPLACE SEMANTIC VIEW trust_center.security_sv
+
+  TABLES (
+    anomaly_signals AS trust_center.anomaly_results
+      PRIMARY KEY (run_id, model_name, user_name, ts)
+      WITH SYNONYMS ('anomaly results', 'signals')
+      COMMENT = 'Per-user per-model anomaly detection results from each scan run',
+    flagged_users AS trust_center.attack_chains
+      PRIMARY KEY (run_id, user_name)
+      WITH SYNONYMS ('attack chains', 'risky users', 'flagged users')
+      COMMENT = 'Users flagged with correlated risk scores, severity, and attack chain labels',
+    cases AS trust_center.cases
+      PRIMARY KEY (case_id)
+      WITH SYNONYMS ('security cases', 'investigations')
+      COMMENT = 'Security investigation cases tracking flagged users through resolution'
+  )
+
+  RELATIONSHIPS (
+    signals_to_users AS
+      anomaly_signals (user_name) REFERENCES flagged_users (user_name),
+    users_to_cases AS
+      flagged_users (user_name) REFERENCES cases (user_name)
+  )
+
+  FACTS (
+    anomaly_signals.anomaly_flag AS CASE WHEN is_anomaly AND distance > 0 THEN 1 ELSE 0 END
+      COMMENT = 'Binary flag: 1 if this signal is a true anomaly above baseline',
+    cases.resolution_hours AS TIMESTAMPDIFF('HOUR', created_at, closed_at)
+      COMMENT = 'Hours from case open to close'
+  )
+
+  DIMENSIONS (
+    anomaly_signals.user_name AS user_name
+      WITH SYNONYMS = ('user', 'account user')
+      COMMENT = 'Snowflake user whose behavior was analyzed',
+    anomaly_signals.model_name AS model_name
+      WITH SYNONYMS = ('model', 'signal', 'detector')
+      COMMENT = 'Name of the ML anomaly detection model',
+    anomaly_signals.is_anomaly AS is_anomaly
+      COMMENT = 'Whether this data point was flagged as anomalous',
+    anomaly_signals.run_id AS run_id
+      COMMENT = 'Unique identifier for the scan run',
+    anomaly_signals.signal_date AS ts::DATE
+      WITH SYNONYMS = ('date', 'day')
+      COMMENT = 'Date of the anomaly signal',
+
+    flagged_users.user_name AS user_name
+      WITH SYNONYMS = ('risky user', 'flagged user')
+      COMMENT = 'Snowflake user who was flagged',
+    flagged_users.severity AS severity
+      WITH SYNONYMS = ('risk level', 'threat level')
+      COMMENT = 'Risk severity: CRITICAL, HIGH, MEDIUM, LOW'
+      SAMPLE_VALUES ('CRITICAL', 'HIGH', 'MEDIUM', 'LOW')
+      IS_ENUM,
+    flagged_users.attack_chain AS attack_chain
+      WITH SYNONYMS = ('attack pattern', 'threat type')
+      COMMENT = 'Classified attack pattern',
+    flagged_users.run_id AS run_id
+      COMMENT = 'Scan run identifier',
+    flagged_users.run_timestamp AS run_timestamp
+      WITH SYNONYMS = ('scan time', 'scan date')
+      COMMENT = 'Timestamp when the scan was run',
+
+    cases.case_id AS case_id
+      COMMENT = 'Unique case identifier',
+    cases.user_name AS user_name
+      COMMENT = 'User under investigation',
+    cases.status AS status
+      WITH SYNONYMS = ('case status', 'state')
+      COMMENT = 'Case status: OPEN, INVESTIGATING, RESOLVED, DISMISSED'
+      SAMPLE_VALUES ('OPEN', 'INVESTIGATING', 'RESOLVED', 'DISMISSED')
+      IS_ENUM,
+    cases.priority AS priority
+      COMMENT = 'Case priority: LOW, MEDIUM, HIGH, URGENT'
+      SAMPLE_VALUES ('LOW', 'MEDIUM', 'HIGH', 'URGENT')
+      IS_ENUM,
+    cases.severity AS severity
+      COMMENT = 'Severity at time of case creation',
+    cases.attack_chain AS attack_chain
+      COMMENT = 'Attack chain at time of case creation',
+    cases.assigned_to AS assigned_to
+      WITH SYNONYMS = ('assignee', 'analyst')
+      COMMENT = 'Analyst assigned to the case',
+    cases.created_date AS created_at::DATE
+      WITH SYNONYMS = ('opened date')
+      COMMENT = 'Date the case was opened'
+  )
+
+  METRICS (
+    anomaly_signals.total_anomalies AS SUM(anomaly_signals.anomaly_flag)
+      WITH SYNONYMS = ('anomaly count', 'number of anomalies')
+      COMMENT = 'Count of anomalous signals',
+    anomaly_signals.avg_distance AS AVG(distance)
+      WITH SYNONYMS = ('average anomaly score', 'mean deviation')
+      COMMENT = 'Average distance from forecast across signals',
+    anomaly_signals.users_affected AS COUNT(DISTINCT CASE WHEN is_anomaly AND distance > 0 THEN user_name END)
+      COMMENT = 'Distinct users with at least one anomaly',
+
+    flagged_users.total_flagged AS COUNT(user_name)
+      WITH SYNONYMS = ('flagged user count')
+      COMMENT = 'Number of users flagged in latest scan',
+    flagged_users.avg_risk_score AS AVG(risk_score)
+      WITH SYNONYMS = ('average risk', 'mean risk score')
+      COMMENT = 'Average risk score across flagged users',
+    flagged_users.total_signals AS SUM(signal_count)
+      COMMENT = 'Total ML model signals across all flagged users',
+
+    cases.open_cases AS COUNT(CASE WHEN status IN ('OPEN', 'INVESTIGATING') THEN 1 END)
+      COMMENT = 'Number of open or in-progress cases',
+    cases.avg_mttr AS AVG(cases.resolution_hours)
+      WITH SYNONYMS = ('mean time to resolve', 'MTTR')
+      COMMENT = 'Average hours from case open to close'
+  )
+
+  COMMENT = 'Security anomaly detection analytics for Cortex Analyst and CoWork'
+
+  AI_SQL_GENERATION 'When filtering flagged_users or attack_chains, always filter to the latest scan run using: run_timestamp = (SELECT MAX(run_timestamp) FROM trust_center.attack_chains). Round all numeric outputs to 1 decimal place.'
+
+  AI_QUESTION_CATEGORIZATION 'This semantic view covers security anomaly detection data only. Reject questions about salary, PII, or topics unrelated to security monitoring. If the user asks about a specific user without specifying a time range, default to the last 7 days.'
+
+  AI_VERIFIED_QUERIES (
+    critical_alert_count AS (
+      QUESTION 'How many critical alerts are there?'
+      ONBOARDING_QUESTION TRUE
+      SQL 'SELECT COUNT(*) AS critical_count FROM flagged_users WHERE severity = ''CRITICAL'' AND run_timestamp = (SELECT MAX(run_timestamp) FROM flagged_users)'
+    ),
+    highest_risk_users AS (
+      QUESTION 'Which users have the highest risk scores?'
+      ONBOARDING_QUESTION TRUE
+      SQL 'SELECT user_name, risk_score, severity, attack_chain, signal_count FROM flagged_users WHERE run_timestamp = (SELECT MAX(run_timestamp) FROM flagged_users) ORDER BY risk_score DESC LIMIT 10'
+    ),
+    anomaly_trend AS (
+      QUESTION 'What is the anomaly trend over the last 30 days?'
+      ONBOARDING_QUESTION TRUE
+      SQL 'SELECT anomaly_signals.signal_date AS day, SUM(anomaly_signals.anomaly_flag) AS total_anomalies, COUNT(DISTINCT CASE WHEN anomaly_signals.is_anomaly AND anomaly_signals.distance > 0 THEN anomaly_signals.user_name END) AS users_affected FROM anomaly_signals GROUP BY day ORDER BY day'
+    ),
+    open_cases_count AS (
+      QUESTION 'How many open cases are there?'
+      SQL 'SELECT COUNT(*) AS open_cases FROM cases WHERE status IN (''OPEN'', ''INVESTIGATING'')'
+    ),
+    model_signal_frequency AS (
+      QUESTION 'Which ML models are firing the most anomalies?'
+      SQL 'SELECT anomaly_signals.model_name, COUNT(*) AS anomaly_count, ROUND(AVG(anomaly_signals.distance), 1) AS avg_distance FROM anomaly_signals WHERE anomaly_signals.is_anomaly = TRUE AND anomaly_signals.distance > 0 GROUP BY anomaly_signals.model_name ORDER BY anomaly_count DESC'
+    )
+  );
+
+GRANT SELECT ON SEMANTIC VIEW trust_center.security_sv
+  TO APPLICATION ROLE trust_center_integration_role;
+
+SELECT 'Semantic view created.' AS status;
+-- ---- END sql/07_semantic_view.sql ----
+
+-- ---- BEGIN sql/08_cortex_agent.sql ----
+-- =============================================================================
+-- 08_cortex_agent.sql
+-- Cortex Agent that uses the semantic view for natural-language security
+-- analytics. Auto-deploys with the app -- no consumer setup required.
+--
+-- Once deployed, this agent:
+--   1. Appears in CoWork for any user with the app role
+--   2. Answers natural-language security questions via Cortex Analyst
+--   3. Generates charts from query results via data_to_chart
+--   4. Supports CoWork features: Deep Research, Automations, Artifacts
+-- =============================================================================
+
+CREATE OR REPLACE AGENT trust_center.security_agent
+  COMMENT = 'AI security analyst for ML behavioral anomaly detection'
+  PROFILE = '{"display_name": "Security Analyst", "color": "blue"}'
+  FROM SPECIFICATION
+  $$
+  models:
+    orchestration: auto
+
+  orchestration:
+    tool_not_accessible: accept
+    budget:
+      seconds: 60
+      tokens: 32000
+
+  instructions:
+    response: |
+      You are a security analyst for Snowflake account monitoring.
+      You help security teams investigate behavioral anomalies detected
+      by 20 ML models that monitor login patterns, query volumes, data
+      access breadth, privilege usage, and data movement.
+
+      When answering questions:
+      - Be specific and cite actual numbers from the data
+      - Explain risk scores (0-100 scale) and severity levels (CRITICAL/HIGH/MEDIUM/LOW)
+      - Describe attack chain patterns in plain language
+      - Suggest investigation steps when discussing risky users
+      - Use charts when showing trends or comparisons
+    orchestration: |
+      Use SecurityAnalyst for all data questions about anomalies, users,
+      risk scores, attack chains, cases, and security metrics.
+      Use data_to_chart when the user asks for visualizations or when
+      showing trends, distributions, or comparisons.
+    sample_questions:
+      - question: "Which users have the highest risk scores right now?"
+      - question: "How many critical alerts are there?"
+      - question: "Show me the anomaly trend over the last 30 days"
+      - question: "What are the most common attack patterns?"
+      - question: "Which ML models are firing the most anomalies?"
+      - question: "How many open cases do we have?"
+
+  tools:
+    - tool_spec:
+        type: "cortex_analyst_text_to_sql"
+        name: "SecurityAnalyst"
+        description: >
+          Queries structured security anomaly data including per-user per-model
+          anomaly signals with actual vs forecast values, correlated attack chain
+          risk scores with severity classifications, and case management records
+          tracking investigation status and resolution times.
+    - tool_spec:
+        type: "data_to_chart"
+        name: "data_to_chart"
+        description: "Generates charts and visualizations from security data"
+
+  tool_resources:
+    SecurityAnalyst:
+      semantic_view: "trust_center.security_sv"
+      execution_environment:
+        type: "warehouse"
+        warehouse: "ml_anomaly_wh"
+  $$;
+
+GRANT USAGE ON AGENT trust_center.security_agent
+  TO APPLICATION ROLE trust_center_integration_role;
+
+SELECT 'Cortex Agent created.' AS status;
+-- ---- END sql/08_cortex_agent.sql ----
 

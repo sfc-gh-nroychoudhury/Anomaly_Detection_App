@@ -2,16 +2,17 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Search, ShieldCheck, UserX, Cpu, ClipboardList } from 'lucide-react';
+import { BarChart3, ShieldAlert, ClipboardList, ShieldOff, Cpu, Settings, Search } from 'lucide-react';
 import clsx from 'clsx';
 import ThemeToggle from './ThemeToggle';
 
 const NAV = [
-  { href: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/', label: 'Overview', icon: BarChart3 },
+  { href: '/dashboard', label: 'Threats', icon: ShieldAlert },
   { href: '/cases', label: 'Cases', icon: ClipboardList },
-  { href: '/exclusions', label: 'Exclusions', icon: UserX },
-  { href: '/models', label: 'Model Health', icon: Cpu },
-  { href: '/setup', label: 'Setup', icon: ShieldCheck },
+  { href: '/exclusions', label: 'Allowlist', icon: ShieldOff },
+  { href: '/models', label: 'Models', icon: Cpu },
+  { href: '/setup', label: 'Settings', icon: Settings },
 ];
 
 export default function Sidebar() {
@@ -51,7 +52,7 @@ export default function Sidebar() {
                 {label}
               </Link>
               {/* Investigate appears after Dashboard when on an investigate page */}
-              {idx === 0 && onInvestigate && (
+              {idx === 1 && onInvestigate && (
                 <Link
                   href={pathname}
                   className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium bg-sf-blue-tint text-sf-blue-dark transition-colors"
@@ -79,16 +80,8 @@ export default function Sidebar() {
 }
 
 function SnowflakeMark() {
-  // A simple six-point mark evoking the product's visual language, not the
-  // official Snowflake logo asset (which is trademarked and not bundled here).
+  /* eslint-disable @next/next/no-img-element */
   return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <g stroke="#29B5E8" strokeWidth="1.6" strokeLinecap="round">
-        <line x1="12" y1="2" x2="12" y2="22" />
-        <line x1="3.2" y1="7" x2="20.8" y2="17" />
-        <line x1="20.8" y1="7" x2="3.2" y2="17" />
-      </g>
-      <circle cx="12" cy="12" r="2.4" fill="#29B5E8" />
-    </svg>
+    <img src="/snowflake-logo.svg" alt="" width={26} height={26} aria-hidden="true" />
   );
 }

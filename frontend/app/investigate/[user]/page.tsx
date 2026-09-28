@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Sparkles, ShieldAlert, FileText, Loader2, LayoutGrid, Clock, TrendingUp, Users2, FolderOpen, ShieldCheck } from 'lucide-react';
+import { Sparkles, ShieldAlert, Loader2, LayoutGrid, Clock, TrendingUp, Users2, FolderOpen, ShieldCheck, Terminal, AlertTriangle } from 'lucide-react';
 import clsx from 'clsx';
 import PageHeader from '@/components/PageHeader';
 import SectionHeader from '@/components/SectionHeader';
@@ -18,6 +18,13 @@ import CasePanel from '@/components/CasePanel';
 import ExportPdfButton from '@/components/ExportPdfButton';
 import Skeleton from '@/components/Skeleton';
 import type { AnomalyResultRow, AttackChainRow, DriftSeriesRow, PeerComparisonRow } from '@/lib/types';
+
+interface RemediationStep {
+  title: string;
+  description: string;
+  sql: string | null;
+  priority: 'immediate' | 'short_term' | 'long_term';
+}
 
 function formatTimeline(raw: string): string {
   try {
@@ -69,9 +76,8 @@ export default function InvestigateUserPage({ params }: { params: { user: string
   const [chain, setChain] = useState<AttackChainRow | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const [remediation, setRemediation] = useState<string | null>(null);
-  const [summary, setSummary] = useState<string | null>(null);
-  const [busy, setBusy] = useState<string | null>(null);
+  const [remediationSteps, setRemediationSteps] = useState<RemediationStep[] | null>(null);
+  const [remediationLoading, setRemediationLoading] = useState(false);
 
   const [drift, setDrift] = useState<DriftSeriesRow[]>([]);
   const [driftLoaded, setDriftLoaded] = useState(false);
@@ -119,19 +125,21 @@ export default function InvestigateUserPage({ params }: { params: { user: string
   const flaggedModels = [...byModel.keys()].filter((m) => (chain?.SIGNALS ?? []).includes(m));
   const modelsToShow = flaggedModels.length > 0 ? flaggedModels : [...byModel.keys()];
 
-  async function runAction(action: 'remediation' | 'summary') {
-    setBusy(action);
-    const url = `/api/investigate/${encodeURIComponent(userName)}/${action}`;
-    const body =
-      action === 'remediation'
-        ? JSON.stringify({ attackChain: chain?.ATTACK_CHAIN, signals: chain?.SIGNALS })
-        : undefined;
-    const res = await fetch(url, { method: 'POST', body, headers: { 'Content-Type': 'application/json' } });
-    const json = await res.json();
-    if (action === 'remediation') setRemediation(json.remediation || json.error || 'No remediation available.');
-    if (action === 'summary') setSummary(json.summary || json.error || 'No summary available.');
-    setBusy(null);
-  }
+  // Auto-fetch remediation and summary when chain data loads
+  useEffect(() => {
+    if (!chain) return;
+    if (remediationSteps !== null) return; // already fetched
+    setRemediationLoading(true);
+    fetch(`/api/investigate/${encodeURIComponent(userName)}/remediation`, {
+      method: 'POST',
+      body: JSON.stringify({ attackChain: chain.ATTACK_CHAIN, signals: chain.SIGNALS }),
+      headers: { 'Content-Type': 'application/json' },
+    })
+      .then((r) => r.json())
+      .then((json) => setRemediationSteps(json.steps ?? []))
+      .catch(() => setRemediationSteps([]))
+      .finally(() => setRemediationLoading(false));
+  }, [chain, userName, remediationSteps]);
 
   return (
     <div>
@@ -182,19 +190,26 @@ export default function InvestigateUserPage({ params }: { params: { user: string
         <div>
           <StreamingNarrative userName={userName} signals={signals} chain={chain} />
 
-          <div className="mb-6 grid grid-cols-2 gap-3">
-            <AiActionButton
-              icon={ShieldAlert}
-              label="Remediation steps"
-              busy={busy === 'remediation'}
-              onClick={() => runAction('remediation')}
-              disabled={!chain}
-            />
-            <AiActionButton icon={FileText} label="Summarize activity" busy={busy === 'summary'} onClick={() => runAction('summary')} />
+          {/* Remediation Steps — auto-loaded */}
+          <div className="mb-2 sf-section-title">
+            <ShieldAlert size={16} className="text-sf-blue-dark" />
+            Remediation steps
           </div>
-
-          {remediation && <AiCard title="Remediation steps" text={remediation} />}
-          {summary && <AiCard title="Recent activity summary" text={summary} />}
+          {remediationLoading ? (
+            <div className="sf-card mb-6 px-5 py-4">
+              <div className="flex items-center gap-2 text-sm text-sf-muted">
+                <Loader2 size={14} className="animate-spin" /> Generating remediation steps...
+              </div>
+            </div>
+          ) : remediationSteps && remediationSteps.length > 0 ? (
+            <div className="mb-6 space-y-2">
+              {remediationSteps.map((step, i) => (
+                <RemediationCard key={i} step={step} index={i + 1} />
+              ))}
+            </div>
+          ) : remediationSteps ? (
+            <div className="sf-card mb-6 px-5 py-3 text-sm text-sf-muted">No remediation steps available.</div>
+          ) : null}
 
           <div className="mb-3 sf-section-title">
             <LayoutGrid size={16} className="text-sf-blue-dark" />
@@ -279,28 +294,37 @@ export default function InvestigateUserPage({ params }: { params: { user: string
   );
 }
 
-function AiActionButton({
-  icon: Icon,
-  label,
-  busy,
-  disabled,
-  onClick,
-}: {
-  icon: typeof Sparkles;
-  label: string;
-  busy: boolean;
-  disabled?: boolean;
-  onClick: () => void;
-}) {
+function RemediationCard({ step, index }: { step: RemediationStep; index: number }) {
+  const priorityColors = {
+    immediate: 'bg-red-500/10 text-red-400 border-red-500/30',
+    short_term: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30',
+    long_term: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
+  };
+  const priorityLabels = { immediate: 'Immediate', short_term: 'Short-term', long_term: 'Long-term' };
+  const colors = priorityColors[step.priority] || priorityColors.short_term;
+  const label = priorityLabels[step.priority] || 'Action';
   return (
-    <button
-      onClick={onClick}
-      disabled={busy || disabled}
-      className="sf-card flex items-center justify-center gap-2 px-4 py-3.5 text-sm font-medium text-sf-blue-dark hover:bg-sf-blue-tint disabled:cursor-not-allowed disabled:opacity-50"
-    >
-      {busy ? <Loader2 size={16} className="animate-spin" /> : <Icon size={16} />}
-      {label}
-    </button>
+    <div className="sf-card px-5 py-3.5">
+      <div className="flex items-start gap-3">
+        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-sf-blue-tint text-xs font-bold text-sf-blue-dark">
+          {index}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="mb-1 flex items-center gap-2">
+            <span className="text-sm font-semibold text-sf-ink">{step.title}</span>
+            <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${colors}`}>
+              {label}
+            </span>
+          </div>
+          <p className="text-sm leading-relaxed text-sf-muted">{step.description}</p>
+          {step.sql && (
+            <pre className="mt-2 overflow-x-auto rounded bg-sf-bg-inset px-3 py-2 text-xs text-sf-ink">
+              <code>{step.sql}</code>
+            </pre>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 

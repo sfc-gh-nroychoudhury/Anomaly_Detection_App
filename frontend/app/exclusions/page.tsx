@@ -37,11 +37,21 @@ export default function ExclusionsPage() {
   }
 
   async function removeExclusion(entityName: string) {
-    await fetch('/api/exclusions/manage', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ entityName }),
-    });
+    try {
+      const res = await fetch('/api/exclusions/manage', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entityName }),
+      });
+      const json = await res.json();
+      if (!res.ok || json.error) {
+        setError(json.error ?? `Delete failed (${res.status})`);
+        return;
+      }
+    } catch (err) {
+      setError((err as Error).message);
+      return;
+    }
     load();
   }
 

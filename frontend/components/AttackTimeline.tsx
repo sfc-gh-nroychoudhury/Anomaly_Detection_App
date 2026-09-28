@@ -70,6 +70,11 @@ function formatDate(ts: string): string {
   return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
 }
 
+function formatTime(ts: string): string {
+  const d = new Date(ts);
+  return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', timeZone: 'UTC', timeZoneName: 'short' });
+}
+
 interface DayGroup {
   date: string;
   label: string;
@@ -203,6 +208,7 @@ export default function AttackTimeline({ signals }: { signals: AnomalyResultRow[
                             <div className="flex items-center gap-2">
                               <span className="text-base">{icon}</span>
                               <span className="text-sm font-medium text-sf-ink">{label}</span>
+                              <span className="text-[10px] tabular-nums text-sf-muted">{formatTime(evt.TS)}</span>
                             </div>
                             <div className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-xs text-sf-muted">
                               <span>

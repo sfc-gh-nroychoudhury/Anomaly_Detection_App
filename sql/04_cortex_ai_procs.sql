@@ -43,7 +43,18 @@ $$
 DECLARE recommendation VARCHAR;
 BEGIN
   SELECT SNOWFLAKE.CORTEX.COMPLETE('mistral-large2',
-    'You are a Snowflake security expert. User "' || :user_name || '" was flagged with attack chain: "' || :attack_chain || '". Signals: ' || ARRAY_TO_STRING(:signals, ', ') || '. Provide 3-5 specific actionable remediation steps (mention SQL commands). Numbered list:'
+    'You are a Snowflake security expert. User "' || :user_name || '" was flagged with attack chain "' || :attack_chain || '". Signals: ' || ARRAY_TO_STRING(:signals, ', ') || '.
+
+Return ONLY a valid JSON array of 3-5 remediation steps. No prose before or after the JSON. Each element must have exactly these keys:
+- "title": short action title (5-8 words)
+- "description": one sentence explanation of what to do and why
+- "sql": a single Snowflake SQL command (or null if not applicable)
+- "priority": "immediate", "short_term", or "long_term"
+
+Example format:
+[{"title":"Rotate user credentials","description":"Force a password reset to invalidate any stolen credentials.","sql":"ALTER USER VLAMBE SET PASSWORD = ''<new_password>'' MUST_CHANGE_PASSWORD = TRUE;","priority":"immediate"}]
+
+JSON array:'
   ) INTO :recommendation;
   RETURN :recommendation;
 END;
@@ -64,7 +75,23 @@ BEGIN
         ORDER BY BYTES_SCANNED DESC LIMIT 20);
 
   SELECT SNOWFLAKE.CORTEX.COMPLETE('mistral-large2',
-    'You are a security analyst. Summarize what user "' || :user_name || '" has been doing in 3-5 sentences. Flag anything suspicious.\n\nRecent queries (top 20 by volume):\n' || COALESCE(:query_sample, 'No queries') || '\n\nSummary:'
+    'You are a senior security analyst writing an executive briefing. Analyze user "' || :user_name || '" activity over the last 7 days.
+
+Return ONLY a valid JSON object with exactly these keys:
+- "risk_level": one of "critical", "high", "medium", "low"
+- "headline": one sentence executive summary of the situation (max 20 words)
+- "findings": array of 3 objects, each with "label" (2-4 word category like "Data Access Pattern", "Authentication Behavior", "Privilege Usage") and "detail" (one concise sentence)
+- "recommendation": one sentence recommended next action for the security team
+
+No prose before or after the JSON.
+
+Example:
+{"risk_level":"high","headline":"User showed unusual data export patterns consistent with potential exfiltration.","findings":[{"label":"Data Access","detail":"Queried 15 tables across 4 databases, 3x above their 30-day average."},{"label":"Export Activity","detail":"Executed COPY INTO commands targeting external stages."},{"label":"Access Timing","detail":"Activity concentrated between 1-4 AM, outside normal working hours."}],"recommendation":"Immediately review recent COPY INTO and GET_PRESIGNED_URL activity and consider temporary access suspension."}
+
+Recent queries (top 20 by volume):
+' || COALESCE(:query_sample, 'No queries') || '
+
+JSON:'
   ) INTO :activity_summary;
   RETURN :activity_summary;
 END;

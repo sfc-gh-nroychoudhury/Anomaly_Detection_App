@@ -28,9 +28,9 @@ export default function SetupPage() {
     <div>
       <PageHeader
         title="One-time setup"
-        description="One-time steps, live-checked below. Most are Snowflake platform requirements no app can automate (explicit consent is required before an app can read account-activity data or register with Trust Center); the last connects the ML models, which must be installed outside the app -- see that step for why."
+        description="Live-checked prerequisites. Most require explicit consent in Snowflake before the app can access account-activity data."
         actions={
-          <button onClick={load} className="sf-btn-secondary" disabled={loading}>
+          <button onClick={load} className="sf-btn-secondary shrink-0" disabled={loading}>
             <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
             Re-check
           </button>

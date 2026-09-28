@@ -1,7 +1,7 @@
 'use client';
 
-import { useRef, useState } from 'react';
-import { Sparkles, Loader2 } from 'lucide-react';
+import { useEffect, useRef, useState, useCallback } from 'react';
+import { Sparkles, Loader2, RefreshCw } from 'lucide-react';
 import type { AnomalyResultRow, AttackChainRow } from '@/lib/types';
 
 export default function StreamingNarrative({
@@ -17,8 +17,9 @@ export default function StreamingNarrative({
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const startedRef = useRef(false);
 
-  async function start() {
+  const start = useCallback(async () => {
     setText('');
     setError(null);
     setStreaming(true);
@@ -71,7 +72,15 @@ export default function StreamingNarrative({
     } finally {
       setStreaming(false);
     }
-  }
+  }, [userName, signals, chain]);
+
+  // Auto-trigger when signals and chain arrive
+  useEffect(() => {
+    if (signals.length > 0 && chain && !startedRef.current) {
+      startedRef.current = true;
+      start();
+    }
+  }, [signals, chain, start]);
 
   return (
     <div className="sf-card mb-6 border-l-4 border-l-sf-blue px-5 py-5">
@@ -80,16 +89,23 @@ export default function StreamingNarrative({
           <Sparkles size={15} className="text-sf-blue-dark" />
           Cortex AI narrative
         </div>
-        <button onClick={start} disabled={streaming} className="sf-btn-secondary py-1.5 text-xs">
-          {streaming ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
-          {streaming ? 'Streaming…' : text ? 'Regenerate' : 'Generate'}
-        </button>
+        {text && !streaming && (
+          <button onClick={start} className="inline-flex items-center gap-1.5 text-xs text-sf-muted hover:text-sf-ink transition-colors">
+            <RefreshCw size={12} />
+            Regenerate
+          </button>
+        )}
       </div>
       {error && <p className="text-sm text-severity-critical">{error}</p>}
       {!error && (
         <p className="whitespace-pre-wrap text-sm leading-relaxed text-sf-ink">
-          {text || (streaming ? '' : 'Streams a live, per-user security narrative token-by-token from Cortex, grounded in this week\u2019s flagged signals.')}
-          {streaming && <span className="ml-0.5 inline-block w-1.5 animate-pulse bg-sf-blue align-middle">&nbsp;</span>}
+          {text || (streaming ? '' : '')}
+          {streaming && !text && (
+            <span className="flex items-center gap-2 text-sf-muted">
+              <Loader2 size={14} className="animate-spin" /> Generating security narrative...
+            </span>
+          )}
+          {streaming && text && <span className="ml-0.5 inline-block w-1.5 animate-pulse bg-sf-blue align-middle">&nbsp;</span>}
         </p>
       )}
     </div>

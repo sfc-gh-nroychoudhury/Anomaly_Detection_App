@@ -5,7 +5,7 @@
 spec:
   containers:
     - name: ui
-      image: /ml_anomaly_pkg/services/app_image_repo/ml_anomaly_ui:v2p30
+      image: /ml_anomaly_pkg/services/app_image_repo/ml_anomaly_ui:v2p40
       resources:
         requests:
           cpu: "0.5"

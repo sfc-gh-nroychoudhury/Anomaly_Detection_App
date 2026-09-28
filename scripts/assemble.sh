@@ -7,12 +7,12 @@ cd "$(dirname "$0")/.."
 {
   echo "-- ============================================================================="
   echo "-- setup_script.sql"
-  echo "-- Assembled from sql/01_*.sql through sql/06_*.sql -- DO NOT hand-edit this file."
+  echo "-- Assembled from sql/01_*.sql through sql/08_*.sql -- DO NOT hand-edit this file."
   echo "-- Edit the source files in sql/ and reassemble instead, so this stays diffable"
   echo "-- and every section traces back to a single source of truth."
   echo "-- ============================================================================="
   echo
-  for f in sql/01_infrastructure.sql sql/02_reference_config.sql sql/03_scan_procedure.sql sql/04_cortex_ai_procs.sql sql/05_service.sql sql/06_enterprise_features.sql; do
+  for f in sql/01_infrastructure.sql sql/02_reference_config.sql sql/03_scan_procedure.sql sql/04_cortex_ai_procs.sql sql/05_service.sql sql/06_enterprise_features.sql sql/07_semantic_view.sql sql/08_cortex_agent.sql; do
     echo "-- ---- BEGIN $f ----"
     cat "$f"
     echo "-- ---- END $f ----"

@@ -112,3 +112,11 @@ body {
   border-color: var(--sf-ink);
 }
 
+/* Recharts tooltip: remove default white wrapper so our custom tooltip styles apply */
+.recharts-tooltip-wrapper {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+

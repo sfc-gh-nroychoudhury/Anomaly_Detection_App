@@ -465,7 +465,7 @@ ORDER BY risk_score DESC;
 
 -- Check 2: anomaly_results has all 20 models
 SELECT '=== MODEL COVERAGE ===' AS section;
-SELECT model_name, COUNT(DISTINCT user_name) as users, COUNT(*) as rows,
+SELECT model_name, COUNT(DISTINCT user_name) as users, COUNT(*) as row_count,
        COUNT_IF(is_anomaly) as anomaly_rows
 FROM ML_ANOMALY_APP.trust_center.anomaly_results
 WHERE run_id = 'demo_attack_sim_001'
