@@ -14,7 +14,13 @@ export async function GET() {
       ORDER BY RISK_SCORE DESC
       LIMIT 100
     `);
-    return NextResponse.json({ rows });
+    return NextResponse.json({
+      rows: rows.map((r) => ({
+        ...r,
+        RISK_SCORE: Number(r.RISK_SCORE) || 0,
+        SIGNAL_COUNT: Number(r.SIGNAL_COUNT) || 0,
+      })),
+    });
   } catch (err) {
     return NextResponse.json({ rows: [], error: (err as Error).message }, { status: 200 });
   }

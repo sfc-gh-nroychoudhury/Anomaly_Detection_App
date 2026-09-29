@@ -26,7 +26,22 @@ export async function GET(_req: Request, { params }: { params: { user: string } 
       ),
     ]);
 
-    return NextResponse.json({ signals, chain: chain[0] ?? null });
+    const coercedSignals = signals.map((r) => ({
+      ...r,
+      METRIC_VALUE: Number(r.METRIC_VALUE) || 0,
+      FORECAST: Number(r.FORECAST) || 0,
+      LOWER_BOUND: Number(r.LOWER_BOUND) || 0,
+      UPPER_BOUND: Number(r.UPPER_BOUND) || 0,
+      PERCENTILE: Number(r.PERCENTILE) || 0,
+      DISTANCE: Number(r.DISTANCE) || 0,
+    }));
+    const coercedChain = chain[0] ? {
+      ...chain[0],
+      RISK_SCORE: Number(chain[0].RISK_SCORE) || 0,
+      SIGNAL_COUNT: Number(chain[0].SIGNAL_COUNT) || 0,
+    } : null;
+
+    return NextResponse.json({ signals: coercedSignals, chain: coercedChain });
   } catch (err) {
     return NextResponse.json({ signals: [], chain: null, error: (err as Error).message });
   }

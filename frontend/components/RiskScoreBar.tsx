@@ -1,7 +1,8 @@
 import clsx from 'clsx';
 
 // Horizontal 0-100 risk score bar with a color ramp matching the severity palette.
-export default function RiskScoreBar({ score }: { score: number }) {
+export default function RiskScoreBar({ score: raw }: { score: number }) {
+  const score = Number(raw) || 0;
   const color =
     score >= 80
       ? 'bg-risk-extreme'

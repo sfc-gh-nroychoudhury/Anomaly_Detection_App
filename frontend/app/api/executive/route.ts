@@ -88,33 +88,33 @@ export async function GET() {
 
     return NextResponse.json({
       kpis: {
-        totalUsersMonitored: kpi.USERS_MONITORED,
-        flaggedUsers: kpi.FLAGGED_USERS,
-        criticalAlerts: kpi.CRITICAL_ALERTS,
-        avgRiskScore: kpi.AVG_RISK_SCORE,
-        openCases: kpi.OPEN_CASES,
-        mttrHours: kpi.MTTR_HOURS,
+        totalUsersMonitored: Number(kpi.USERS_MONITORED) || 0,
+        flaggedUsers: Number(kpi.FLAGGED_USERS) || 0,
+        criticalAlerts: Number(kpi.CRITICAL_ALERTS) || 0,
+        avgRiskScore: Number(kpi.AVG_RISK_SCORE) || 0,
+        openCases: Number(kpi.OPEN_CASES) || 0,
+        mttrHours: kpi.MTTR_HOURS != null ? Number(kpi.MTTR_HOURS) : null,
       },
       dailyTrend: dailyTrend.map((r) => ({
         day: r.DAY,
-        anomalies: r.ANOMALIES,
-        usersAffected: r.USERS_AFFECTED,
+        anomalies: Number(r.ANOMALIES) || 0,
+        usersAffected: Number(r.USERS_AFFECTED) || 0,
       })),
       chainDistribution: chainDist.map((r) => ({
         chain: r.CHAIN,
-        count: r.COUNT,
+        count: Number(r.COUNT) || 0,
       })),
       modelSignals: modelSignals.map((r) => ({
         model: r.MODEL,
-        anomalies: r.ANOMALIES,
-        avgDistance: r.AVG_DISTANCE,
+        anomalies: Number(r.ANOMALIES) || 0,
+        avgDistance: Number(r.AVG_DISTANCE) || 0,
       })),
       topUsers: topUsers.map((r) => ({
         userName: r.USER_NAME,
-        riskScore: r.RISK_SCORE,
+        riskScore: Number(r.RISK_SCORE) || 0,
         severity: r.SEVERITY,
         attackChain: r.ATTACK_CHAIN,
-        signalCount: r.SIGNAL_COUNT,
+        signalCount: Number(r.SIGNAL_COUNT) || 0,
       })),
     });
   } catch (err) {

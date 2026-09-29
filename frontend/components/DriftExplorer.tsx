@@ -27,11 +27,11 @@ export default function DriftExplorer({ rows }: { rows: DriftSeriesRow[] }) {
         .filter((r) => r.MODEL_NAME === activeModel)
         .map((r) => ({
           ts: new Date(r.TS).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
-          actual: r.METRIC_VALUE,
-          forecast: r.FORECAST,
-          band: [r.LOWER_BOUND, r.UPPER_BOUND],
+          actual: Number(r.METRIC_VALUE) || 0,
+          forecast: Number(r.FORECAST) || 0,
+          band: [Number(r.LOWER_BOUND) || 0, Number(r.UPPER_BOUND) || 0],
           gap: Math.abs(Number(r.METRIC_VALUE) - Number(r.FORECAST)),
-          anomaly: r.IS_ANOMALY ? r.METRIC_VALUE : null,
+          anomaly: r.IS_ANOMALY ? Number(r.METRIC_VALUE) || 0 : null,
         })),
     [rows, activeModel]
   );

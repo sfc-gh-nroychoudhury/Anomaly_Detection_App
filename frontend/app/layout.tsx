@@ -1,10 +1,21 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+import localFont from 'next/font/local';
 import './globals.css';
 import Sidebar from '@/components/Sidebar';
 import SetupBanner from '@/components/SetupBanner';
+import ThemeScript from '@/components/ThemeScript';
 
-const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
+const inter = localFont({
+  src: [
+    { path: '../public/fonts/Inter-Regular.woff2', weight: '400', style: 'normal' },
+    { path: '../public/fonts/Inter-Medium.woff2', weight: '500', style: 'normal' },
+    { path: '../public/fonts/Inter-SemiBold.woff2', weight: '600', style: 'normal' },
+    { path: '../public/fonts/Inter-Bold.woff2', weight: '700', style: 'normal' },
+  ],
+  variable: '--font-inter',
+  display: 'swap',
+  fallback: ['system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+});
 
 export const metadata: Metadata = {
   title: 'ML Behavioral Anomaly Detection',
@@ -15,13 +26,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={inter.variable}>
       <head>
-        {/* Runs before hydration so the correct theme class is present on first
-            paint -- avoids a flash of light-mode before React mounts. */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('theme');if(t==='dark'||(!t&&window.matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.classList.add('dark');}}catch(e){}})();`,
-          }}
-        />
+        <ThemeScript />
       </head>
       <body>
         <div className="flex h-screen w-full overflow-hidden">

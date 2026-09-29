@@ -28,12 +28,16 @@ export default function PeerRadarChart({ rows }: { rows: PeerComparisonRow[] }) 
   // Normalize each model's axis to 0-100 using the peer max as the scale, so
   // models with very different units (bytes vs. counts) plot on one radar.
   const data = rows.map((r) => {
-    const scale = r.PEER_MAX > 0 ? r.PEER_MAX : Math.max(r.USER_VALUE, r.PEER_AVG, 1);
+    const uv = Number(r.USER_VALUE) || 0;
+    const pa = Number(r.PEER_AVG) || 0;
+    const p95 = Number(r.PEER_P95) || 0;
+    const pm = Number(r.PEER_MAX) || 0;
+    const scale = pm > 0 ? pm : Math.max(uv, pa, 1);
     return {
       model: r.MODEL_NAME.replace(/^ad_/, '').replace(/_/g, ' '),
-      you: Math.round((r.USER_VALUE / scale) * 100),
-      peerAvg: Math.round((r.PEER_AVG / scale) * 100),
-      peerP95: Math.round((r.PEER_P95 / scale) * 100),
+      you: Math.round((uv / scale) * 100),
+      peerAvg: Math.round((pa / scale) * 100),
+      peerP95: Math.round((p95 / scale) * 100),
     };
   });
 

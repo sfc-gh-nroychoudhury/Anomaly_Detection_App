@@ -219,7 +219,8 @@ BEGIN
     ('ad_db_breadth','reconnaissance',30),('ad_table_breadth','reconnaissance',30),('ad_failed_queries','reconnaissance',25),
     ('ad_role_usage','privilege_escalation',35),('ad_ddl_operations','privilege_escalation',40),('ad_grant_operations','privilege_escalation',50),
     ('ad_data_staging','insider_threat',35),('ad_outbound_transfer','exfiltration',50),('ad_ext_function_calls','exfiltration',45),
-    ('ad_warehouse_credits','resource_abuse',25),('ad_warehouse_queries','resource_abuse',20)
+    ('ad_warehouse_credits','resource_abuse',25),('ad_warehouse_queries','resource_abuse',20),
+    ('ad_cloud_services_credits','cost_anomaly',30),('ad_serverless_task_credits','cost_anomaly',35),('ad_pipe_credits','cost_anomaly',30),('ad_user_credits','cost_anomaly',35),('ad_storage_growth','cost_anomaly',25)
   ),
   per_entity AS (
     SELECT a.SERIES AS entity_name, COUNT(DISTINCT a.MODEL_NAME) AS signal_count, ARRAY_AGG(DISTINCT a.MODEL_NAME) AS signals, ARRAY_AGG(DISTINCT mw.category) AS categories,
@@ -238,6 +239,7 @@ BEGIN
            WHEN ARRAY_CONTAINS('privilege_escalation'::VARIANT,categories) THEN 'privilege_abuse'
            WHEN ARRAY_CONTAINS('reconnaissance'::VARIANT,categories) THEN 'reconnaissance_activity'
            WHEN ARRAY_CONTAINS('resource_abuse'::VARIANT,categories) THEN 'resource_hijacking'
+           WHEN ARRAY_CONTAINS('cost_anomaly'::VARIANT,categories) THEN 'cost_abuse'
            ELSE 'behavioral_anomaly' END AS attack_chain,
       CASE WHEN signal_count >= 4 OR risk_score >= 80 THEN 'CRITICAL' WHEN signal_count >= 3 OR risk_score >= 60 THEN 'HIGH' WHEN signal_count >= 2 OR risk_score >= 40 THEN 'MEDIUM' ELSE 'LOW' END AS severity,
       first_anomaly, last_anomaly, anomaly_details
@@ -321,7 +323,7 @@ BEGIN
   FROM SNOWFLAKE.ACCOUNT_USAGE.QUERY_HISTORY
   WHERE USER_NAME = :user_name AND START_TIME >= DATEADD('day', -7, CURRENT_TIMESTAMP()) AND EXECUTION_STATUS = 'SUCCESS';
 
-  SELECT SNOWFLAKE.CORTEX.COMPLETE('mistral-large2',
+  SELECT SNOWFLAKE.CORTEX.COMPLETE('llama3.1-70b',
     'You are a security analyst. Based on the following ML anomaly detection signals for user "' || :user_name || '", write a 3-4 sentence security finding narrative. Be specific about what happened and the risk.\n\nAnomaly signals: ' || COALESCE(:signal_summary, 'none') || '\nRecent query types: ' || COALESCE(:query_summary, 'unknown') || '\n\nNarrative:'
   ) INTO :explanation;
 
@@ -337,7 +339,7 @@ AS
 $$
 DECLARE recommendation VARCHAR;
 BEGIN
-  SELECT SNOWFLAKE.CORTEX.COMPLETE('mistral-large2',
+  SELECT SNOWFLAKE.CORTEX.COMPLETE('llama3.1-70b',
     'You are a Snowflake security expert. User "' || :user_name || '" was flagged with attack chain "' || :attack_chain || '". Signals: ' || ARRAY_TO_STRING(:signals, ', ') || '.
 
 Return ONLY a valid JSON array of 3-5 remediation steps. No prose before or after the JSON. Each element must have exactly these keys:
@@ -369,7 +371,7 @@ BEGIN
         WHERE USER_NAME = :user_name AND START_TIME >= DATEADD('day', -:days_back, CURRENT_TIMESTAMP()) AND EXECUTION_STATUS = 'SUCCESS'
         ORDER BY BYTES_SCANNED DESC LIMIT 20);
 
-  SELECT SNOWFLAKE.CORTEX.COMPLETE('mistral-large2',
+  SELECT SNOWFLAKE.CORTEX.COMPLETE('llama3.1-70b',
     'You are a senior security analyst writing an executive briefing. Analyze user "' || :user_name || '" activity over the last 7 days.
 
 Return ONLY a valid JSON object with exactly these keys:
@@ -431,36 +433,26 @@ CREATE OR ALTER VERSIONED SCHEMA core;
 -- family selection: CPU_X64_XS is available on every cloud Snowflake runs on.
 LET pool_name VARCHAR := CURRENT_DATABASE() || '_ui_pool';
 
-CREATE COMPUTE POOL IF NOT EXISTS IDENTIFIER(:pool_name)
-  MIN_NODES = 1
-  MAX_NODES = 1
-  INSTANCE_FAMILY = CPU_X64_XS
-  AUTO_RESUME = TRUE
-  AUTO_SUSPEND_SECS = 1800;
+BEGIN
+  CREATE COMPUTE POOL IF NOT EXISTS IDENTIFIER(:pool_name)
+    MIN_NODES = 1
+    MAX_NODES = 1
+    INSTANCE_FAMILY = CPU_X64_XS
+    AUTO_RESUME = TRUE
+    AUTO_SUSPEND_SECS = 1800;
 
--- Service function protocol note: this service only serves the web UI
--- (default_web_endpoint) and calls out to Snowflake itself from inside the
--- container (see frontend/lib/snowflake.ts) -- it does not register any
--- SQL service functions, so no POST-handler contract applies here.
-CREATE SERVICE IF NOT EXISTS services.ui_service
-  IN COMPUTE POOL IDENTIFIER(:pool_name)
-  FROM SPECIFICATION_FILE = '/containers/service_spec.yaml'
-  QUERY_WAREHOUSE = ml_anomaly_wh;
+  CREATE SERVICE IF NOT EXISTS services.ui_service
+    IN COMPUTE POOL IDENTIFIER(:pool_name)
+    FROM SPECIFICATION_FILE = '/containers/service_spec.yaml'
+    QUERY_WAREHOUSE = ml_anomaly_wh;
 
-GRANT USAGE ON SCHEMA services TO APPLICATION ROLE trust_center_integration_role;
-GRANT USAGE, MONITOR, OPERATE ON SERVICE services.ui_service TO APPLICATION ROLE trust_center_integration_role;
-
--- Endpoint access control: `GRANT USAGE ON SERVICE` above is for
--- inspecting/monitoring the service object (SHOW ENDPOINTS,
--- SYSTEM$WAIT_FOR_SERVICES) -- it does NOT grant access to the web endpoint
--- itself. That requires separately granting the per-endpoint SERVICE ROLE
--- declared in containers/service_spec.yaml's `serviceRoles:` block.
--- Confirmed empirically: without this grant, visiting the endpoint URL after
--- a successful SSO login returns `ERROR_FORBIDDEN` /
--- "Access denied. Insufficient privileges to use <endpoint-host>." This
--- grant requires OWNERSHIP on the service, which only the app itself has --
--- it cannot be granted from outside by ACCOUNTADMIN after the fact.
-GRANT SERVICE ROLE services.ui_service!ui_endpoint_role TO APPLICATION ROLE trust_center_integration_role;
+  GRANT USAGE ON SCHEMA services TO APPLICATION ROLE trust_center_integration_role;
+  GRANT USAGE, MONITOR, OPERATE ON SERVICE services.ui_service TO APPLICATION ROLE trust_center_integration_role;
+  GRANT SERVICE ROLE services.ui_service!ui_endpoint_role TO APPLICATION ROLE trust_center_integration_role;
+EXCEPTION
+  WHEN OTHER THEN
+    NULL;
+END;
 
 -- ---------------------------------------------------------------------------
 -- Upgrade support: version_initializer runs after setup_script.sql on every
@@ -477,8 +469,11 @@ AS
 $$
 BEGIN
   ALTER SERVICE services.ui_service FROM SPECIFICATION_FILE = '/containers/service_spec.yaml';
-  CALL SYSTEM$WAIT_FOR_SERVICES(120, 'services.ui_service');
+  CALL SYSTEM$WAIT_FOR_SERVICES(1800, 'services.ui_service');
   RETURN 'ui_service upgraded and healthy.';
+EXCEPTION
+  WHEN OTHER THEN
+    RETURN 'ui_service not yet created -- grant privileges and call RECREATE_SERVICE().';
 END;
 $$;
 
@@ -500,6 +495,7 @@ DECLARE
 BEGIN
   old_pool_name := CURRENT_DATABASE() || '_UI_POOL';
   new_pool_name := CURRENT_DATABASE() || '_UI_POOL2';
+  CREATE SCHEMA IF NOT EXISTS services;
   DROP SERVICE IF EXISTS services.ui_service;
   BEGIN
     DROP COMPUTE POOL IF EXISTS IDENTIFIER(:old_pool_name);
@@ -517,7 +513,7 @@ BEGIN
     QUERY_WAREHOUSE = ml_anomaly_wh;
   GRANT USAGE, MONITOR, OPERATE ON SERVICE services.ui_service TO APPLICATION ROLE trust_center_integration_role;
   GRANT SERVICE ROLE services.ui_service!ui_endpoint_role TO APPLICATION ROLE trust_center_integration_role;
-  CALL SYSTEM$WAIT_FOR_SERVICES(120, 'services.ui_service');
+  CALL SYSTEM$WAIT_FOR_SERVICES(1800, 'services.ui_service');
   RETURN 'ui_service recreated on a brand-new compute pool.';
 END;
 $$;

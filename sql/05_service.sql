@@ -75,7 +75,7 @@ AS
 $$
 BEGIN
   ALTER SERVICE services.ui_service FROM SPECIFICATION_FILE = '/containers/service_spec.yaml';
-  CALL SYSTEM$WAIT_FOR_SERVICES(120, 'services.ui_service');
+  CALL SYSTEM$WAIT_FOR_SERVICES(1800, 'services.ui_service');
   RETURN 'ui_service upgraded and healthy.';
 END;
 $$;
@@ -115,7 +115,7 @@ BEGIN
     QUERY_WAREHOUSE = ml_anomaly_wh;
   GRANT USAGE, MONITOR, OPERATE ON SERVICE services.ui_service TO APPLICATION ROLE trust_center_integration_role;
   GRANT SERVICE ROLE services.ui_service!ui_endpoint_role TO APPLICATION ROLE trust_center_integration_role;
-  CALL SYSTEM$WAIT_FOR_SERVICES(120, 'services.ui_service');
+  CALL SYSTEM$WAIT_FOR_SERVICES(1800, 'services.ui_service');
   RETURN 'ui_service recreated on a brand-new compute pool.';
 END;
 $$;

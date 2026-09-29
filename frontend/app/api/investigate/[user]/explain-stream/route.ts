@@ -39,7 +39,7 @@ export async function POST(req: Request, { params }: { params: { user: string } 
       Accept: 'text/event-stream',
     },
     body: JSON.stringify({
-      model: 'mistral-large2',
+      model: 'llama3.1-70b',
       messages: [{ role: 'user', content: prompt }],
       stream: true,
     }),

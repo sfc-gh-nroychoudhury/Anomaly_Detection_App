@@ -27,6 +27,9 @@ const MODEL_LABELS: Record<string, string> = {
   ad_grant_operations: 'Grant ops', ad_data_staging: 'Data staging',
   ad_outbound_transfer: 'Outbound transfer', ad_ext_function_calls: 'Ext functions',
   ad_warehouse_credits: 'WH credits', ad_warehouse_queries: 'WH queries',
+  ad_cloud_services_credits: 'Cloud svc credits', ad_serverless_task_credits: 'Task credits',
+  ad_pipe_credits: 'Pipe credits', ad_user_credits: 'User credits',
+  ad_storage_growth: 'Storage growth',
 };
 
 const CHAIN_LABELS: Record<string, string> = {
@@ -39,6 +42,7 @@ const CHAIN_LABELS: Record<string, string> = {
   reconnaissance_activity: 'Reconnaissance',
   resource_hijacking: 'Resource Hijacking',
   behavioral_anomaly: 'Behavioral Anomaly',
+  cost_abuse: 'Cost Abuse',
 };
 
 interface ExecData {
@@ -293,7 +297,7 @@ function SignalCoverageCard({ signals }: { signals: ExecData['modelSignals'] }) 
       </div>
       <div className="divide-y divide-sf-line">
         {top.map((s) => {
-          const tier = severityTier(s.avgDistance);
+          const tier = severityTier(Number(s.avgDistance) || 0);
           const pct = (s.anomalies / maxCount) * 100;
           const lbl = MODEL_LABELS[s.model] ?? s.model.replace(/^ad_/, '');
           return (
@@ -315,7 +319,7 @@ function SignalCoverageCard({ signals }: { signals: ExecData['modelSignals'] }) 
                 className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
                 style={{ background: tier.bg, color: tier.color }}
               >
-                {s.avgDistance.toFixed(1)}σ
+                {Number(s.avgDistance).toFixed(1)}σ
               </span>
             </div>
           );

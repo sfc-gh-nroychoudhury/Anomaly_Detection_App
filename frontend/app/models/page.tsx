@@ -17,6 +17,8 @@ const CATEGORY_OF: Record<string, string> = {
   ad_role_usage: 'Privilege Escalation', ad_ddl_operations: 'Privilege Escalation', ad_grant_operations: 'Privilege Escalation',
   ad_data_staging: 'Insider Threat', ad_outbound_transfer: 'Insider Threat', ad_ext_function_calls: 'Insider Threat',
   ad_warehouse_credits: 'Resource Abuse', ad_warehouse_queries: 'Resource Abuse',
+  ad_cloud_services_credits: 'Cost Anomaly', ad_serverless_task_credits: 'Cost Anomaly',
+  ad_pipe_credits: 'Cost Anomaly', ad_user_credits: 'Cost Anomaly', ad_storage_growth: 'Cost Anomaly',
 };
 
 export default function ModelsPage() {
@@ -36,7 +38,7 @@ export default function ModelsPage() {
     <div>
       <PageHeader
         title="Model Health"
-        description="20 SNOWFLAKE.ML.ANOMALY_DETECTION models, retrained weekly. These live outside the app and are retrained by a task in that external schema -- see the Setup page for why."
+        description="25 SNOWFLAKE.ML.ANOMALY_DETECTION models, retrained weekly. These live outside the app and are retrained by a task in that external schema -- see the Setup page for why."
       />
 
       <div className="sf-card mb-6 flex items-center gap-3 px-5 py-4">

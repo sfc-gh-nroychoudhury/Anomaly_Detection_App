@@ -26,6 +26,11 @@ const MODEL_LABELS: Record<string, string> = {
   ad_ext_function_calls: 'Ext. function calls',
   ad_warehouse_credits: 'Warehouse credits',
   ad_warehouse_queries: 'Warehouse queries',
+  ad_cloud_services_credits: 'Cloud services credits',
+  ad_serverless_task_credits: 'Serverless task credits',
+  ad_pipe_credits: 'Snowpipe credits',
+  ad_user_credits: 'Per-user credits',
+  ad_storage_growth: 'Storage growth',
 };
 
 const MODEL_ICONS: Record<string, string> = {
@@ -36,6 +41,8 @@ const MODEL_ICONS: Record<string, string> = {
   ad_role_usage: '👤', ad_ddl_operations: '🔧', ad_grant_operations: '🔐',
   ad_data_staging: '📥', ad_outbound_transfer: '🚀', ad_ext_function_calls: '⚡',
   ad_warehouse_credits: '💰', ad_warehouse_queries: '⚙️',
+  ad_cloud_services_credits: '☁️', ad_serverless_task_credits: '⏱️',
+  ad_pipe_credits: '🔄', ad_user_credits: '💳', ad_storage_growth: '📈',
 };
 
 function fmt(n: number): string {

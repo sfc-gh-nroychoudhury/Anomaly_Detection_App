@@ -12,10 +12,11 @@ import {
 } from 'recharts';
 import type { AnomalyResultRow } from '@/lib/types';
 
-function fmt(v: number): string {
-  if (Math.abs(v) >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
-  if (Math.abs(v) >= 1_000) return `${(v / 1_000).toFixed(1)}K`;
-  return v % 1 === 0 ? String(v) : v.toFixed(1);
+function fmt(v: number | string): string {
+  const n = Number(v) || 0;
+  if (Math.abs(n) >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (Math.abs(n) >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return n % 1 === 0 ? String(n) : n.toFixed(1);
 }
 
 function CustomTooltip({ active, payload, label }: any) {
@@ -47,7 +48,7 @@ function CustomTooltip({ active, payload, label }: any) {
           <Row label="Forecast" value={fmt(row.forecast)} />
           {band && <Row label="Expected range" value={`${fmt(band[0])} – ${fmt(band[1])}`} />}
           {row.distance != null && row.distance > 0 && (
-            <Row label="Deviation" value={`${row.distance.toFixed(1)}σ`} warn={row.distance > 2} />
+            <Row label="Deviation" value={`${Number(row.distance).toFixed(1)}σ`} warn={row.distance > 2} />
           )}
         </tbody>
       </table>
